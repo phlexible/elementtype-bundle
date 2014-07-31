@@ -6,21 +6,27 @@
  * @license   proprietary
  */
 
-namespace Phlexible\Bundle\ElementtypeBundle\Elementtype;
+namespace Phlexible\Bundle\ElementtypeBundle\Doctrine;
 
-use Phlexible\Bundle\ElementtypeBundle\Elementtype\Loader\LoaderInterface;
+use Doctrine\ORM\EntityManager;
 use Phlexible\Bundle\ElementtypeBundle\ElementtypeEvents;
 use Phlexible\Bundle\ElementtypeBundle\ElementtypesMessage;
+use Phlexible\Bundle\ElementtypeBundle\Entity\Elementtype;
+use Phlexible\Bundle\ElementtypeBundle\Entity\Repository\ElementtypeRepository;
 use Phlexible\Bundle\ElementtypeBundle\Event\ElementtypeEvent;
+use Phlexible\Bundle\ElementtypeBundle\Exception\CreateCancelledException;
+use Phlexible\Bundle\ElementtypeBundle\Exception\DeleteCancelledException;
+use Phlexible\Bundle\ElementtypeBundle\Exception\UpdateCancelledException;
+use Phlexible\Bundle\ElementtypeBundle\Model\ElementtypeManagerInterface;
 use Phlexible\Bundle\MessageBundle\Message\MessagePoster;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
- * Elementtype repository
+ * Elementtype manager
  *
  * @author Stephan Wentz <sw@brainbits.net>
  */
-class ElementtypeRepository
+class ElementtypeManager implements ElementtypeManagerInterface
 {
     /**
      * @var EventDispatcherInterface
@@ -28,9 +34,9 @@ class ElementtypeRepository
     private $dispatcher;
 
     /**
-     * @var LoaderInterface
+     * @var EntityManager
      */
-    private $loader;
+    private $entityManager;
 
     /**
      * @var MessagePoster
@@ -38,35 +44,35 @@ class ElementtypeRepository
     private $messageService;
 
     /**
-     * @var ElementtypeCollection
+     * ElementtypeRepository
      */
-    private $elementtypes;
+    private $elementtypeRepository;
 
     /**
+     * @param EntityManager            $entityManager
      * @param EventDispatcherInterface $dispatcher
-     * @param LoaderInterface          $loader
      * @param MessagePoster            $messageService
      */
     public function __construct(
+        EntityManager $entityManager,
         EventDispatcherInterface $dispatcher,
-        LoaderInterface $loader,
         MessagePoster $messageService)
     {
+        $this->entityManager = $entityManager;
         $this->dispatcher = $dispatcher;
-        $this->loader = $loader;
         $this->messageService = $messageService;
     }
 
     /**
-     * @return ElementtypeCollection
+     * @return ElementtypeRepository
      */
-    public function getCollection()
+    private function getElementtypeRepository()
     {
-        if (null === $this->elementtypes) {
-            $this->elementtypes = $this->loader->load();
+        if (null === $this->elementtypeRepository) {
+            $this->elementtypeRepository = $this->entityManager->getRepository('PhlexibleElementtypeBundle:Elementtype');
         }
 
-        return $this->elementtypes;
+        return $this->elementtypeRepository;
     }
 
     /**
@@ -78,19 +84,19 @@ class ElementtypeRepository
      */
     public function find($elementtypeId)
     {
-        return $this->getCollection()->get($elementtypeId);
+        return $this->getElementtypeRepository()->find($elementtypeId);
     }
 
     /**
-     * Find element type by unique ID
+     * Find element type by unique Id
      *
-     * @param string $uniqueID
+     * @param string $uniqueId
      *
      * @return Elementtype
      */
-    public function findByUniqueID($uniqueID)
+    public function findOneByUniqueId($uniqueId)
     {
-        return $this->getCollection()->getByUniqueId($uniqueID);
+        return $this->getElementtypeRepository()->findOneBy(array('uniqueId' => $uniqueId));
     }
 
     /**
@@ -102,7 +108,7 @@ class ElementtypeRepository
      */
     public function findByType($type)
     {
-        return $this->getCollection()->getByType($type);
+        return $this->getElementtypeRepository()->findBy(array('type' => $type));
     }
 
     /**
@@ -112,7 +118,7 @@ class ElementtypeRepository
      */
     public function findAll()
     {
-        return $this->getCollection()->getAll();
+        return $this->getElementtypeRepository()->findAll();
     }
 
     /**
@@ -120,19 +126,20 @@ class ElementtypeRepository
      *
      * @param Elementtype $elementtype
      *
-     * @throws \Exception
-     *
+     * @throws CreateCancelledException
+     * @throws UpdateCancelledException
      * @return $this
      */
-    public function save(Elementtype $elementtype)
+    public function updateElementtype(Elementtype $elementtype)
     {
-        if (!$elementtype->getId()) {
+        if (!$this->entityManager->contains($elementtype)) {
             $event = new ElementtypeEvent($elementtype);
-            if (!$this->dispatcher->dispatch(ElementtypeEvents::BEFORE_CREATE, $event)) {
-                throw new \Exception('Create canceled by callback.');
+            if ($this->dispatcher->dispatch(ElementtypeEvents::BEFORE_CREATE, $event)->isPropagationStopped()) {
+                throw new CreateCancelledException('Create canceled by callback.');
             }
 
-            $this->loader->insert($elementtype);
+            $this->entityManager->persist($elementtype);
+            $this->entityManager->flush($elementtype);
 
             $event = new ElementtypeEvent($elementtype);
             $this->dispatcher->dispatch(ElementtypeEvents::CREATE, $event);
@@ -142,11 +149,12 @@ class ElementtypeRepository
             $this->messageService->post($message);
         } else {
             $event = new ElementtypeEvent($elementtype);
-            if (!$this->dispatcher->dispatch(ElementtypeEvents::BEFORE_UPDATE, $event)) {
-                throw new \Exception('Create canceled by callback.');
+            if ($this->dispatcher->dispatch(ElementtypeEvents::BEFORE_UPDATE, $event)->isPropagationStopped()) {
+                throw new UpdateCancelledException('Create canceled by callback.');
             }
 
-            $this->loader->update($elementtype);
+            $this->entityManager->persist($elementtype);
+            $this->entityManager->flush($elementtype);
 
             $event = new ElementtypeEvent($elementtype);
             $this->dispatcher->dispatch(ElementtypeEvents::UPDATE, $event);
@@ -164,16 +172,15 @@ class ElementtypeRepository
      *
      * @param Elementtype $elementtype
      *
+     * @throws DeleteCancelledException
      * @return $this
-     * @throws ElementtypeException
      */
-    public function delete(Elementtype $elementtype)
+    public function deleteElementtype(Elementtype $elementtype)
     {
-
         // post before event
         $event = new ElementtypeEvent($elementtype);
-        if (!$this->dispatcher->dispatch(ElementtypeEvents::BEFORE_DELETE, $event)) {
-            throw new ElementtypeException('Delete canceled by listener.');
+        if ($this->dispatcher->dispatch(ElementtypeEvents::BEFORE_DELETE, $event)->isPropagationStopped()) {
+            throw new DeleteCancelledException('Delete canceled by listener.');
         }
 
         $delete = true;

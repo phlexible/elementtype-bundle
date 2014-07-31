@@ -9,11 +9,11 @@
 namespace Phlexible\Bundle\ElementtypeBundle\Exception;
 
 /**
- * Elementtype exception
+ * Update cancelled exception
  *
  * @author Stephan Wentz <sw@brainbits.net>
  */
-class ElementtypeException extends Exception
+class UpdateCancelledException extends Exception
 {
 
 }

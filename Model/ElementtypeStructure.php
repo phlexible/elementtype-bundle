@@ -6,9 +6,10 @@
  * @license   proprietary
  */
 
-namespace Phlexible\Bundle\ElementtypeBundle\ElementtypeStructure;
+namespace Phlexible\Bundle\ElementtypeBundle\Model;
 
-use Phlexible\Bundle\ElementtypeBundle\ElementtypeVersion\ElementtypeVersion;
+use Phlexible\Bundle\ElementtypeBundle\Entity\ElementtypeStructureNode;
+use Phlexible\Bundle\ElementtypeBundle\Entity\ElementtypeVersion;
 
 /**
  * Elementtype structure

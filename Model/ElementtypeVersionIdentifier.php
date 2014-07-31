@@ -6,16 +6,16 @@
  * @license   proprietary
  */
 
-namespace Phlexible\Bundle\ElementtypeBundle\ElementtypeVersion;
+namespace Phlexible\Bundle\ElementtypeBundle\Model;
 
-use Phlexible\Bundle\LockBundle\LockIdentifier;
+use Phlexible\Component\Identifier\Identifier;
 
 /**
  * Elementtype version identifier
  *
  * @author Stephan Wentz <sw@brainbits.net>
  */
-class ElementtypeVersionIdentifier extends LockIdentifier
+class ElementtypeVersionIdentifier extends Identifier
 {
     /**
      * @param int    $elementTypeId
